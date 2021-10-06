@@ -7,7 +7,8 @@ import com.ab.springbootreactbackend.util.GenericResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -23,26 +24,20 @@ public class UserController {
     private UserService userService;
 
     @PostMapping("/create")
-    public ResponseEntity<?> createUser(@Valid @RequestBody User user) {
+    public GenericResponse createUser(@Valid @RequestBody User user) {
+        userService.createUser(user);
+        return new GenericResponse("user created");
+    }
 
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleValidationException(MethodArgumentNotValidException exception) {
         ApiError error = new ApiError(400, "Validation Error", "api/v1/users/create");
         Map<String, String> validationErrors = new HashMap<>();
-        String userName = user.getUsername();
-        if (userName == null || userName.length() == 0) {
-            validationErrors.put("username", "username cannot be null");
-            error.setValidationErrors(validationErrors);
+        for(FieldError fieldError:exception.getBindingResult().getFieldErrors()){
+            validationErrors.put(fieldError.getField(),fieldError.getDefaultMessage());
         }
-        String displayName = user.getDisplayName();
-        if (displayName == null || displayName.length() == 0) {
-            validationErrors.put("displayName", "cannot be null");
-            error.setValidationErrors(validationErrors);
-        }
-
-        if (validationErrors.size() > 0) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-        }
-
-        userService.createUser(user);
-        return ResponseEntity.ok(new GenericResponse("user created"));
+        error.setValidationErrors(validationErrors);
+        return error;
     }
 }
